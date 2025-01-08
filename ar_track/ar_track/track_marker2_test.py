@@ -7,7 +7,6 @@ from ros2_aruco_interfaces.msg import ArucoMarkers
 from math import degrees, radians, sqrt, sin, cos, pi
 from tf_transformations import euler_from_quaternion #, quaternion_from_euler
 from ar_track.move_tb3 import MoveTB3
-from ar_track.delay import Delay
 
 TARGET_ID = int(sys.argv[1]) # argv[1] = id of target marker
 
@@ -20,7 +19,6 @@ LIN_SPEED = MAX_LIN_SPEED * 0.075
 ANG_SPEED = MAX_ANG_SPEED * 0.075
 
 R = 1.5708
-
 
 class TrackMarker(Node):
     """   
@@ -35,7 +33,7 @@ class TrackMarker(Node):
                                 y                           |  /      |      \  |
                                                             | /       |       \0|
                                                             |/R-0    R|R    R-0\|
-    pose.x = position.z                             (0 > O) x---------+---------x (0 < O)
+    pose.x = position.z                             (0 < O) x---------+---------x (0 > O)
     pose.y = position.x              [0]roll    (pos.x > O) ^                   ^ (pos.x < O)
     theta  = euler_from_quaternion(q)[1]pitch*              |                   |            
                                      [2]yaw               robot               robot
@@ -52,15 +50,19 @@ class TrackMarker(Node):
             qos_profile)
             
         self.pub_tw   = self.create_publisher(Twist, '/cmd_vel', qos_profile)
+        self.pub_lift = self.create_publisher(String, '/lift__msg', qos_profile)
+        self.timer    = self.create_timer(1, self.count_sec)
         
         self.pose = Pose()
         self.tw   = Twist()
         self.tb3  = MoveTB3()
+        self.lift_msg = String()
         
         self.theta   = 0.0
-        self.dir     = 1
+        self.dir     = 0
         self.th_ref  = 0.0
         self.z_ref   = 0.0
+        self.cnt_sec = 0
         
         self.target_found = False
         
@@ -100,8 +102,63 @@ class TrackMarker(Node):
     def get_theta(self, msg):
         q = (msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w)
         euler = euler_from_quaternion(q)
-        theta = euler[1]        
-        return theta
+
+        theta_values = []
+        duration = 0.5  # 0.5 seconds duration for averaging
+        start_time = self.get_clock().now().seconds_nanoseconds()[0]  # Start time in seconds
+
+        while True:
+            current_time = self.get_clock().now().seconds_nanoseconds()[0]
+            if current_time - start_time > duration:
+                break
+
+            # Capture theta values
+            theta = euler[1]
+            if theta != 0:  # Exclude zero values
+                theta_values.append(theta)
+            rclpy.spin_once(self, timeout_sec=0.01)
+
+        # Filter out max, min, and compute the average
+        if len(theta_values) > 2:
+            # Remove max and min values after excluding zeros
+            theta_values.remove(max(theta_values))
+            theta_values.remove(min(theta_values))
+            average_theta = sum(theta_values) / len(theta_values)
+        elif len(theta_values) > 0:
+            # Fallback to average of available values
+            average_theta = sum(theta_values) / len(theta_values)
+        else:
+            # Fallback to the current value if no valid data
+            average_theta = euler[1]
+
+        return average_theta
+
+    # def get_theta(self, msg):
+    #     q = (msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w)
+    #     euler = euler_from_quaternion(q)
+
+    #     theta_values = []
+    #     duration = 0.5  # 0.5 seconds
+    #     start_time = self.get_clock().now().seconds_nanoseconds()[0]
+
+    #     while self.get_clock().now().seconds_nanoseconds()[0] - start_time < duration:
+    #         theta = euler[1]
+    #         if theta != 0:  # Ignore zero values
+    #             theta_values.append(theta)
+    #         rclpy.spin_once(self, timeout_sec=0.02)  # Adjust timeout for fewer iterations
+
+    #     if len(theta_values) > 2:
+    #         theta_values.sort()
+    #         theta_values = theta_values[1:-1]  # Remove min and max
+    #         average_theta = sum(theta_values) / len(theta_values)
+    #     elif len(theta_values) > 0:
+    #         average_theta = sum(theta_values) / len(theta_values)
+    #     else:
+    #         average_theta = euler[1]
+
+    #     return average_theta
+
+
     
     def count_sec(self):
         self.cnt_sec = self.cnt_sec + 1    
@@ -187,10 +244,36 @@ def main(args=None):
             node.pub_tw.publish(node.tw)                
             rclpy.spin_once(node, timeout_sec=0.02)
             
-        dist2 = node.pose.position.z - 0.05
+        dist2 = node.pose.position.z - 0.185
         node.tb3.straight(dist2)
+        print("\n----- 6_arrived lifting position!\n") ####################
+        
+        node.pub_lift_msg("lift_up")
+        duration = node.cnt_sec + 10
+        
+        while node.cnt_sec < duration: 
+            print(duration - node.cnt_sec)               
+            rclpy.spin_once(node, timeout_sec=1.0)
+        print("\n----- 7_finished loading!\n") ############################     
+        
+        node.tb3.straight(-dist2)
+        node.tb3.rotate(R * node.dir)
+        node.tb3.straight(-dist1)
+        print("\n----- 8_arrived starting point!\n") ######################
+        
+        node.pub_lift_msg("lift_down")
+        duration = node.cnt_sec + 8
+        
+        while node.cnt_sec < duration: 
+            print(duration - node.cnt_sec)               
+            rclpy.spin_once(node, timeout_sec=1.0)
+        print("\n----- 7_finished unloading!\n") ###########################       
+        
+        node.tb3.straight(-0.1)
+        node.tb3.rotate(R * node.dir * -1)
         
         sys.exit(1)
+        rclpy.spin(node)
                 
     except KeyboardInterrupt:
         node.get_logger().info('Keyboard Interrupt(SIGINT)')
@@ -202,4 +285,3 @@ def main(args=None):
             
 if __name__ == '__main__':
     main()
-

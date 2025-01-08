@@ -78,9 +78,9 @@ class MoveTB3(Node):
         print("rotate start from: %s" %(round(degrees(self.org.theta), 2)))
         
         if angle >= 0.0:	# angle(+): rotate left(ccw)
-            tw.angular.z =  ANG_SPD
+            tw.angular.z =  ANG_SPD;
         else:			# angle(-): rotate right(cw)
-            tw.angular.z = -ANG_SPD
+            tw.angular.z = -ANG_SPD;
             
         #self.pub_tw.publish(tw)
         while rclpy.ok():

@@ -7,7 +7,6 @@ from ros2_aruco_interfaces.msg import ArucoMarkers
 from math import degrees, radians, sqrt, sin, cos, pi
 from tf_transformations import euler_from_quaternion #, quaternion_from_euler
 from ar_track.move_tb3 import MoveTB3
-from ar_track.delay import Delay
 
 TARGET_ID = int(sys.argv[1]) # argv[1] = id of target marker
 
@@ -35,7 +34,7 @@ class TrackMarker(Node):
                                 y                           |  /      |      \  |
                                                             | /       |       \0|
                                                             |/R-0    R|R    R-0\|
-    pose.x = position.z                             (0 > O) x---------+---------x (0 < O)
+    pose.x = position.z                             (0 < O) x---------+---------x (0 > O)
     pose.y = position.x              [0]roll    (pos.x > O) ^                   ^ (pos.x < O)
     theta  = euler_from_quaternion(q)[1]pitch*              |                   |            
                                      [2]yaw               robot               robot
@@ -52,15 +51,19 @@ class TrackMarker(Node):
             qos_profile)
             
         self.pub_tw   = self.create_publisher(Twist, '/cmd_vel', qos_profile)
+        self.pub_lift = self.create_publisher(String, '/lift__msg', qos_profile)
+        self.timer    = self.create_timer(1, self.count_sec)
         
         self.pose = Pose()
         self.tw   = Twist()
         self.tb3  = MoveTB3()
+        self.lift_msg = String()
         
         self.theta   = 0.0
-        self.dir     = 1
+        self.dir     = 0
         self.th_ref  = 0.0
         self.z_ref   = 0.0
+        self.cnt_sec = 0
         
         self.target_found = False
         
@@ -112,7 +115,7 @@ class TrackMarker(Node):
         self.pub_lift.publish(msg)
     
     def stop_move(self):
-        self.tw.linear.z = self.tw.angular.z = 0.0
+        self.tw.linear.x = self.tw.angular.z = 0.0
         self.pub_tw.publish(self.tw)      
         
         
@@ -157,9 +160,9 @@ def main(args=None):
             angle = pi - angle
         
         if   node.th_ref > radians( 10):
-            node.tb3.rotate( angle * .9)
+            node.tb3.rotate( -angle * .9)
         elif node.th_ref < radians(-10):
-            node.tb3.rotate(-angle * .97)
+            node.tb3.rotate(angle * .97)
         else:
             pass        
         print("\n----- 3_1st rotation finished!\n") #########################
@@ -187,10 +190,36 @@ def main(args=None):
             node.pub_tw.publish(node.tw)                
             rclpy.spin_once(node, timeout_sec=0.02)
             
-        dist2 = node.pose.position.z - 0.05
+        dist2 = node.pose.position.z - 0.185
         node.tb3.straight(dist2)
+        print("\n----- 6_arrived lifting position!\n") ####################
+        
+        node.pub_lift_msg("lift_up")
+        duration = node.cnt_sec + 10
+        
+        while node.cnt_sec < duration: 
+            print(duration - node.cnt_sec)               
+            rclpy.spin_once(node, timeout_sec=1.0)
+        print("\n----- 7_finished loading!\n") ############################     
+        
+        node.tb3.straight(-dist2)
+        node.tb3.rotate(R * node.dir)
+        node.tb3.straight(-dist1)
+        print("\n----- 8_arrived starting point!\n") ######################
+        
+        node.pub_lift_msg("lift_down")
+        duration = node.cnt_sec + 8
+        
+        while node.cnt_sec < duration: 
+            print(duration - node.cnt_sec)               
+            rclpy.spin_once(node, timeout_sec=1.0)
+        print("\n----- 7_finished unloading!\n") ###########################       
+        
+        node.tb3.straight(-0.1)
+        node.tb3.rotate(R * node.dir * -1)
         
         sys.exit(1)
+        rclpy.spin(node)
                 
     except KeyboardInterrupt:
         node.get_logger().info('Keyboard Interrupt(SIGINT)')

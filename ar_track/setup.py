@@ -22,11 +22,17 @@ setup(
     entry_points={
         'console_scripts': [
             'sub_marker_pose = ar_track.sub_marker_pose:main',
+            'get_theta = ar_track.get_theta:main',
+            'get_theta2 = ar_track.get_theta2:main',
+            'get_theta3 = ar_track.get_theta3:main',
+            'get_theta4 = ar_track.get_theta4:main',
             'pub_tb3_pose2d  = ar_track.pub_tb3_pose2d:main',
             'test_move_tb3   = ar_track.test_move_tb3:main',
             'stop_tb3        = ar_track.stop_tb3:main',
             'track_marker    = ar_track.track_marker:main',
             'track_marker2   = ar_track.track_marker2:main', #align2marker
+            'track_marker2_try   = ar_track.track_marker2_try:main',
+            'keep_dist   = ar_track.keep_dist:main', 
             'align2marker   = ar_track.align2marker:main', 
             'timer_test      = ar_track.timer_test:main',
             'img_compressed2raw      = ar_track.img_compressed2raw:main',

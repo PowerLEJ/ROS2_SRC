@@ -7,7 +7,6 @@ from ros2_aruco_interfaces.msg import ArucoMarkers
 from math import degrees, radians, sqrt, sin, cos, pi
 from tf_transformations import euler_from_quaternion #, quaternion_from_euler
 from ar_track.move_tb3 import MoveTB3
-from ar_track.delay import Delay
 
 TARGET_ID = int(sys.argv[1]) # argv[1] = id of target marker
 
@@ -35,7 +34,7 @@ class TrackMarker(Node):
                                 y                           |  /      |      \  |
                                                             | /       |       \0|
                                                             |/R-0    R|R    R-0\|
-    pose.x = position.z                             (0 > O) x---------+---------x (0 < O)
+    pose.x = position.z                             (0 < O) x---------+---------x (0 > O)
     pose.y = position.x              [0]roll    (pos.x > O) ^                   ^ (pos.x < O)
     theta  = euler_from_quaternion(q)[1]pitch*              |                   |            
                                      [2]yaw               robot               robot
@@ -52,15 +51,19 @@ class TrackMarker(Node):
             qos_profile)
             
         self.pub_tw   = self.create_publisher(Twist, '/cmd_vel', qos_profile)
+        self.pub_lift = self.create_publisher(String, '/lift__msg', qos_profile)
+        self.timer    = self.create_timer(1, self.count_sec)
         
         self.pose = Pose()
         self.tw   = Twist()
         self.tb3  = MoveTB3()
+        self.lift_msg = String()
         
         self.theta   = 0.0
-        self.dir     = 1
+        self.dir     = 0
         self.th_ref  = 0.0
         self.z_ref   = 0.0
+        self.cnt_sec = 0
         
         self.target_found = False
         
@@ -114,6 +117,76 @@ class TrackMarker(Node):
     def stop_move(self):
         self.tw.linear.z = self.tw.angular.z = 0.0
         self.pub_tw.publish(self.tw)      
+
+    # def adjust_distance(self):
+    #     dist_ref = 0.15  # Desired distance (15 cm)
+    #     margin = 0.025   # Acceptable margin (2.5 cm)
+
+    #     while rclpy.ok():
+    #         rclpy.spin_once(self, timeout_sec=0.1)
+
+    #         if self.pose.position.z > dist_ref + margin:
+    #             self.tw.linear.x = 0.05
+    #             print("forward")
+    #         elif self.pose.position.z < dist_ref - margin:
+    #             self.tw.linear.x = -0.05
+    #             print("back")
+    #         else:
+    #             self.tw.linear.x = 0.0
+    #             print("stop")
+    #             self.pub_tw.publish(self.tw)
+    #             print("stop")
+    #             break
+            
+    #         self.pub_tw.publish(self.tw)
+
+    def adjust_distance(self):
+        dist_ref = 0.15  # Desired distance (15 cm)
+        margin = 0.025   # Acceptable margin (2.5 cm)
+        marker_lost = False  # Flag to track marker visibility
+
+        while rclpy.ok():
+            rclpy.spin_once(self, timeout_sec=0.1)
+
+            if not self.marker_visible():
+                marker_lost = True
+                print("Marker lost. Searching for marker...")
+                self.search_marker()  # Function to search for the marker
+
+            if marker_lost:
+                # If marker is lost, do not move forward until it's found
+                continue
+            
+            # Adjust movement based on distance
+            if self.pose.position.z > dist_ref + margin:
+                self.tw.linear.x = 0.05
+                print("forward")
+            elif self.pose.position.z < dist_ref - margin:
+                self.tw.linear.x = -0.05
+                print("back")
+            else:
+                self.tw.linear.x = 0.0
+                print("stop")
+                self.pub_tw.publish(self.tw)
+                print("stop")
+                break
+            
+            self.pub_tw.publish(self.tw)
+
+    def marker_visible(self):
+        # Check if marker is detected (you would need to implement this)
+        # Return True if visible, False otherwise
+        return True  # Placeholder
+
+    def search_marker(self):
+        # Code to search for the marker, e.g., rotate or move to known position
+        print("Searching for marker...")
+        self.tw.angular.z = 0.2  # Rotate slowly
+        self.pub_tw.publish(self.tw)
+        rclpy.sleep(1)  # Give some time for rotation/searching
+        self.tw.angular.z = 0.0  # Stop rotating
+        self.pub_tw.publish(self.tw)
+        print("Marker search complete.")
         
         
 def main(args=None):
@@ -187,10 +260,40 @@ def main(args=None):
             node.pub_tw.publish(node.tw)                
             rclpy.spin_once(node, timeout_sec=0.02)
             
-        dist2 = node.pose.position.z - 0.05
-        node.tb3.straight(dist2)
+        dist2 = node.pose.position.z - 0.185
+        # node.tb3.straight(dist2)
+        print("\n----- 6_arrived lifting position!\n") ####################
+        
+        print("\n----- 6.1_adjusting distance...\n")
+        node.adjust_distance()
+        print("\n----- 6.2_adjustment finished!\n")
+
+        node.pub_lift_msg("lift_up")
+        duration = node.cnt_sec + 10
+        
+        while node.cnt_sec < duration: 
+            print(duration - node.cnt_sec)               
+            rclpy.spin_once(node, timeout_sec=1.0)
+        print("\n----- 7_finished loading!\n") ############################     
+        
+        node.tb3.straight(-dist2)
+        node.tb3.rotate(R * node.dir)
+        node.tb3.straight(-dist1)
+        print("\n----- 8_arrived starting point!\n") ######################
+        
+        node.pub_lift_msg("lift_down")
+        duration = node.cnt_sec + 8
+        
+        while node.cnt_sec < duration: 
+            print(duration - node.cnt_sec)               
+            rclpy.spin_once(node, timeout_sec=1.0)
+        print("\n----- 7_finished unloading!\n") ###########################       
+        
+        node.tb3.straight(-0.1)
+        node.tb3.rotate(R * node.dir * -1)
         
         sys.exit(1)
+        rclpy.spin(node)
                 
     except KeyboardInterrupt:
         node.get_logger().info('Keyboard Interrupt(SIGINT)')
