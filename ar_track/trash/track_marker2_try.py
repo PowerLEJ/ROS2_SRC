@@ -118,46 +118,13 @@ class TrackMarker(Node):
         self.tw.linear.z = self.tw.angular.z = 0.0
         self.pub_tw.publish(self.tw)      
 
-    # def adjust_distance(self):
-    #     dist_ref = 0.15  # Desired distance (15 cm)
-    #     margin = 0.025   # Acceptable margin (2.5 cm)
-
-    #     while rclpy.ok():
-    #         rclpy.spin_once(self, timeout_sec=0.1)
-
-    #         if self.pose.position.z > dist_ref + margin:
-    #             self.tw.linear.x = 0.05
-    #             print("forward")
-    #         elif self.pose.position.z < dist_ref - margin:
-    #             self.tw.linear.x = -0.05
-    #             print("back")
-    #         else:
-    #             self.tw.linear.x = 0.0
-    #             print("stop")
-    #             self.pub_tw.publish(self.tw)
-    #             print("stop")
-    #             break
-            
-    #         self.pub_tw.publish(self.tw)
-
     def adjust_distance(self):
         dist_ref = 0.15  # Desired distance (15 cm)
         margin = 0.025   # Acceptable margin (2.5 cm)
-        marker_lost = False  # Flag to track marker visibility
 
         while rclpy.ok():
             rclpy.spin_once(self, timeout_sec=0.1)
 
-            if not self.marker_visible():
-                marker_lost = True
-                print("Marker lost. Searching for marker...")
-                self.search_marker()  # Function to search for the marker
-
-            if marker_lost:
-                # If marker is lost, do not move forward until it's found
-                continue
-            
-            # Adjust movement based on distance
             if self.pose.position.z > dist_ref + margin:
                 self.tw.linear.x = 0.05
                 print("forward")
@@ -173,20 +140,53 @@ class TrackMarker(Node):
             
             self.pub_tw.publish(self.tw)
 
-    def marker_visible(self):
-        # Check if marker is detected (you would need to implement this)
-        # Return True if visible, False otherwise
-        return True  # Placeholder
+    # def adjust_distance(self):
+    #     dist_ref = 0.15  # Desired distance (15 cm)
+    #     margin = 0.025   # Acceptable margin (2.5 cm)
+    #     marker_lost = False  # Flag to track marker visibility
 
-    def search_marker(self):
-        # Code to search for the marker, e.g., rotate or move to known position
-        print("Searching for marker...")
-        self.tw.angular.z = 0.2  # Rotate slowly
-        self.pub_tw.publish(self.tw)
-        rclpy.sleep(1)  # Give some time for rotation/searching
-        self.tw.angular.z = 0.0  # Stop rotating
-        self.pub_tw.publish(self.tw)
-        print("Marker search complete.")
+    #     while rclpy.ok():
+    #         rclpy.spin_once(self, timeout_sec=0.1)
+
+    #         if not self.marker_visible():
+    #             marker_lost = True
+    #             print("Marker lost. Searching for marker...")
+    #             self.search_marker()  # Function to search for the marker
+
+    #         if marker_lost:
+    #             # If marker is lost, do not move forward until it's found
+    #             continue
+            
+    #         # Adjust movement based on distance
+    #         if self.pose.position.z > dist_ref + margin:
+    #             self.tw.linear.x = 0.05
+    #             print("forward")
+    #         elif self.pose.position.z < dist_ref - margin:
+    #             self.tw.linear.x = -0.05
+    #             print("back")
+    #         else:
+    #             self.tw.linear.x = 0.0
+    #             print("stop")
+    #             self.pub_tw.publish(self.tw)
+    #             print("stop")
+    #             break
+            
+    #         self.pub_tw.publish(self.tw)
+
+    # def marker_visible(self):
+    #     # Check if marker is detected (you would need to implement this)
+    #     # Return True if visible, False otherwise
+    #     return True  # Placeholder
+
+    # def search_marker(self):
+    #     # Code to search for the marker, e.g., rotate or move to known position
+    #     print("Searching for marker...")
+    #     self.tw.angular.z = 0.2  # Rotate slowly
+    #     self.pub_tw.publish(self.tw)
+    #     rclpy.sleep(1)  # Give some time for rotation/searching
+    #     self.tw.angular.z = 0.0  # Stop rotating
+    #     self.pub_tw.publish(self.tw)
+    #     print("Marker search complete.")
         
         
 def main(args=None):
@@ -261,11 +261,11 @@ def main(args=None):
             rclpy.spin_once(node, timeout_sec=0.02)
             
         dist2 = node.pose.position.z - 0.185
-        # node.tb3.straight(dist2)
+        node.tb3.straight(dist2)
         print("\n----- 6_arrived lifting position!\n") ####################
         
         print("\n----- 6.1_adjusting distance...\n")
-        node.adjust_distance()
+        # node.adjust_distance()
         print("\n----- 6.2_adjustment finished!\n")
 
         node.pub_lift_msg("lift_up")

@@ -30,13 +30,14 @@ setup(
             'test_move_tb3   = ar_track.test_move_tb3:main',
             'stop_tb3        = ar_track.stop_tb3:main',
             'track_marker    = ar_track.track_marker:main',
-            'track_marker2   = ar_track.track_marker2:main', #align2marker
-            'track_marker2_try   = ar_track.track_marker2_try:main',
+            'track_marker2   = ar_track.track_marker2:main',
+            'track_marker2_re   = ar_track.track_marker2_re:main',
+            'track_marker2_re2   = ar_track.track_marker2_re2:main',
+            'track_marker2_re3   = ar_track.track_marker2_re3:main',
             'keep_dist   = ar_track.keep_dist:main', 
             'align2marker   = ar_track.align2marker:main', 
             'timer_test      = ar_track.timer_test:main',
             'img_compressed2raw      = ar_track.img_compressed2raw:main',
-            #img_compressed2raw
         ],
     },
 )
